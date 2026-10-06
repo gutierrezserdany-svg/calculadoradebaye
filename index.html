@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Probabilidad condicional y Bayes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#f4f5f6;--card:#fff;--line:#d9dce0;--text:#1b1d21;--muted:#5d646c;--ok:#17794f;--b2:#b9791a;--err:#c0392b;--field:#f0f1f3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121418;--card:#1c1f25;--line:#2c3038;--text:#e8eaed;--muted:#9aa1a9;--ok:#5ec28f;--b2:#e0a94a;--err:#ff7b7b;--field:#272b33}}
+:root[data-theme="dark"]{--bg:#121418;--card:#1c1f25;--line:#2c3038;--text:#e8eaed;--muted:#9aa1a9;--ok:#5ec28f;--b2:#e0a94a;--err:#ff7b7b;--field:#272b33}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "IBM Plex Sans",system-ui,"Segoe UI",Arial,sans-serif}
+main{max-width:560px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 20px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+label{display:block;font-size:.9rem;margin:12px 0 4px;color:var(--muted)}
+label:first-child{margin-top:0}
+input[type=text]{width:100%;font:inherit;font-size:1.05rem;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--text)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
+.modo{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 0}
+.modo label{display:flex;align-items:center;gap:6px;margin:0;color:var(--text);cursor:pointer}
+button{width:100%;margin-top:16px;font:inherit;font-weight:700;padding:12px;border:0;border-radius:6px;background:var(--ok);color:#0b1a12;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.res small{display:block;color:var(--muted);font-size:.85rem}
+.res b{font-size:1.2rem;color:var(--ok);font-variant-numeric:tabular-nums}
+h2{font-size:1rem;margin:0 0 12px}
+.bar{display:flex;height:26px;border-radius:6px;overflow:hidden;background:var(--field)}
+.bar span{display:block;height:100%;transition:width .3s}
+#sA{background:var(--ok)}#sN{background:var(--b2)}
+.leyenda{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;color:var(--muted);margin-top:6px}
+pre{margin:0;white-space:pre-wrap;font:.88rem/1.6 ui-monospace,Consolas,monospace;color:var(--muted)}
+pre.error{color:var(--err)}
+@media (prefers-reduced-motion:reduce){.bar span{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Probabilidad condicional y Bayes</h1>
+<p class="sub">Ingresa tus datos. Los resultados se actualizan al escribir.</p>
+
+<section class="card">
+  <label for="pa">P(A): probabilidad de A</label>
+  <input id="pa" type="text" inputmode="decimal" value="0.5">
+  <label for="pba">P(B|A): probabilidad de B dado A</label>
+  <input id="pba" type="text" inputmode="decimal" value="0.7">
+  <div class="modo" role="radiogroup" aria-label="Dato adicional">
+    <label><input type="radio" name="modo" value="pb" checked> Conozco P(B)</label>
+    <label><input type="radio" name="modo" value="nb"> Conozco P(B|¬A)</label>
+  </div>
+  <div id="boxPB"><label for="pb">P(B): probabilidad de B</label><input id="pb" type="text" inputmode="decimal" value="0.4"></div>
+  <div id="boxNB" hidden><label for="pnb">P(B|¬A): probabilidad de B dado no A</label><input id="pnb" type="text" inputmode="decimal" value="0.1"></div>
+  <button id="btn" type="button">Calcular</button>
+</section>
+
+<section class="card">
+  <h2>Resultados</h2>
+  <div class="grid res">
+    <div><small>P(A ∩ B) Intersección</small><b id="r_inter">-</b></div>
+    <div><small>P(A|B) Bayes</small><b id="r_cond">-</b></div>
+    <div><small>P(¬A|B) Complemento</small><b id="r_noab">-</b></div>
+    <div><small>P(A ∪ B) Unión</small><b id="r_union">-</b></div>
+    <div><small>P(B) Probabilidad total</small><b id="r_total">-</b></div>
+    <div><small>P(B|¬A)</small><b id="r_bna">-</b></div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>De todos los casos con B, ¿cuántos tienen A?</h2>
+  <div class="bar" aria-hidden="true"><span id="sA" style="width:0"></span><span id="sN" style="width:0"></span></div>
+  <div class="leyenda"><span>Con A: <b id="lA">-</b></span><span>Sin A: <b id="lN">-</b></span></div>
+</section>
+
+<section class="card"><pre id="detalle"></pre></section>
+</main>
+
+<script>
+const EPS = 1e-12;
+const $ = id => document.getElementById(id);
+const fmt = p => p.toFixed(4) + " (" + (p * 100).toFixed(2) + "%)";
+
+function leer(id, nombre) {
+  const t = $(id).value.trim().replace(",", ".");
+  if (t === "") throw new Error("Falta ingresar " + nombre + ".");
+  const v = Number(t);
+  if (Number.isNaN(v)) throw new Error(nombre + " debe ser un número.");
+  if (v < 0 || v > 1) throw new Error(nombre + " debe estar entre 0 y 1.");
+  return v;
+}
+
+function limpiar() {
+  ["r_inter","r_cond","r_noab","r_union","r_total","r_bna","lA","lN"].forEach(i => $(i).textContent = "-");
+  $("sA").style.width = "0"; $("sN").style.width = "0";
+}
+
+function calcular() {
+  const det = $("detalle");
+  try {
+    const pA = leer("pa", "P(A)"), pBA = leer("pba", "P(B|A)");
+    const pNA = 1 - pA, pInter = pBA * pA;
+    const modo = document.querySelector('input[name=modo]:checked').value;
+    let pB, pInterNA, pBNA, nota;
+
+    if (modo === "pb") {
+      pB = leer("pb", "P(B)");
+      if (pB < pInter - EPS)
+        throw new Error("Datos incoherentes: P(B)=" + pB.toFixed(4) + " no puede ser menor que P(A∩B)=" + pInter.toFixed(4) + ".");
+      pInterNA = Math.max(pB - pInter, 0);
+      if (pNA > EPS) {
+        pBNA = pInterNA / pNA;
+        if (pBNA > 1 + EPS) throw new Error("Datos incoherentes: con esos valores P(B|¬A) sería mayor que 1.");
+      } else {
+        if (pInterNA > EPS) throw new Error("Datos incoherentes: P(A)=1 pero P(B) > P(B|A).");
+        pBNA = null;
+      }
+      nota = "P(B) = " + pB.toFixed(4) + " (dato)";
+    } else {
+      pBNA = leer("pnb", "P(B|¬A)");
+      pInterNA = pBNA * pNA;
+      pB = pInter + pInterNA;
+      nota = "P(B) = " + pBA.toFixed(4) + "·" + pA.toFixed(4) + " + " + pBNA.toFixed(4) + "·" + pNA.toFixed(4) + " = " + pB.toFixed(4);
+    }
+    if (pB < EPS) throw new Error("P(B) = 0: la probabilidad condicional P(A|B) no está definida.");
+
+    const pAB = pInter / pB, pNAB = pInterNA / pB, pUnion = pA + pB - pInter;
+    $("r_inter").textContent = fmt(pInter);
+    $("r_cond").textContent = fmt(pAB);
+    $("r_noab").textContent = fmt(pNAB);
+    $("r_union").textContent = fmt(pUnion);
+    $("r_total").textContent = fmt(pB);
+    $("r_bna").textContent = pBNA === null ? "No definida" : fmt(pBNA);
+    $("sA").style.width = (pAB * 100) + "%";
+    $("sN").style.width = (pNAB * 100) + "%";
+    $("lA").textContent = (pAB * 100).toFixed(2) + "%";
+    $("lN").textContent = (pNAB * 100).toFixed(2) + "%";
+
+    const indep = Math.abs(pAB - pA) < 1e-9;
+    det.className = "";
+    det.textContent = nota + "\nP(A|B) = P(B|A)·P(A) / P(B)\n       = " + pBA.toFixed(4) + "·" + pA.toFixed(4) +
+      " / " + pB.toFixed(4) + " = " + pAB.toFixed(4) + "\nA y B son " + (indep ? "independientes" : "dependientes");
+  } catch (e) {
+    limpiar();
+    det.className = "error";
+    det.textContent = e.message;
+  }
+}
+
+document.querySelectorAll("input[name=modo]").forEach(r => r.addEventListener("change", () => {
+  const pb = document.querySelector('input[name=modo]:checked').value === "pb";
+  $("boxPB").hidden = !pb; $("boxNB").hidden = pb;
+  calcular();
+}));
+["pa","pba","pb","pnb"].forEach(i => $(i).addEventListener("input", calcular));
+$("btn").addEventListener("click", calcular);
+calcular();
+</script>
+</body>
+</html>
